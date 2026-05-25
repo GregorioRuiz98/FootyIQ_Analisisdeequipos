@@ -1,0 +1,6 @@
+2026/05/24-01:52:14.593 c318 Creating DB C:\Users\tirion\Desktop\WorkStationVSC\nuevoFootballHub\scraper\.chrome_profile\Default\IndexedDB\https_www.fotmob.com_0.indexeddb.leveldb since it was missing.
+2026/05/24-01:52:14.597 c318 Reusing MANIFEST C:\Users\tirion\Desktop\WorkStationVSC\nuevoFootballHub\scraper\.chrome_profile\Default\IndexedDB\https_www.fotmob.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/05/24-02:30:22.000 b91c Level-0 table #5: started
+2026/05/24-02:30:22.002 b91c Level-0 table #5: 3701 bytes OK
+2026/05/24-02:30:22.003 b91c Delete type=0 #3
+2026/05/24-02:30:22.003 b91c Manual compaction at level-0 from (begin) .. (end); will stop at (end)

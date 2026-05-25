@@ -1,0 +1,13 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/footyiq}
+
+app:
+  jwtSecret: ${JWT_SECRET:super-secret-key-change-in-production}
+  jwtExpirationMs: 86400000
+  scraperBaseUrl: ${SCRAPER_BASE_URL:http://localhost:8001}
+  uploadsPath: ${UPLOADS_PATH:uploads}
