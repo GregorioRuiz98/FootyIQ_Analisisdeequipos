@@ -40,6 +40,16 @@ scripts/      local development scripts
 
 ## Quick Start
 
+### One-Time Setup (New PC)
+
+Before running the app for the first time on a new machine:
+
+```powershell
+.\instalar-requisitos-footyiq.bat
+```
+
+This installs Node, Java 21, Maven, Python, project dependencies and Playwright Chromium for the scraper.
+
 ### Docker Compose
 
 ```powershell

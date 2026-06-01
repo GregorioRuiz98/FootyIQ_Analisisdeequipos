@@ -46,6 +46,29 @@ function Start-InNewWindow {
   Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoExit", "-Command", $full) | Out-Null
 }
 
+function Resolve-PythonCommand {
+  $candidates = @(
+    "python",
+    "py -3.12",
+    "py -3.13",
+    "py -3"
+  )
+
+  foreach ($candidate in $candidates) {
+    try {
+      $checkCmd = "$candidate -c \"import uvicorn\""
+      cmd /c $checkCmd *> $null
+      if ($LASTEXITCODE -eq 0) {
+        return $candidate
+      }
+    } catch {
+      # Continue probing candidates
+    }
+  }
+
+  return $null
+}
+
 # --- 1. MongoDB -----------------------------------------------------
 if (-not $SkipMongo) {
   Write-Host "[1/4] MongoDB (puerto 27017)" -ForegroundColor Yellow
@@ -65,11 +88,17 @@ if (-not $SkipScraper) {
   if (Test-Port 8001) {
     Write-Host "      Ya esta arriba - no se reinicia" -ForegroundColor Green
   } else {
-    # En Windows (Python 3.13), Playwright puede fallar con --reload
-    # al crear subprocess internos. Se arranca sin recarga para estabilidad.
-    $cmd = "python -m uvicorn app.main:app --port 8001"
-    Start-InNewWindow -Title "footyiq-scraper" -WorkingDir "$Root\scraper" -Command $cmd
-    Write-Host "      Lanzado en nueva ventana" -ForegroundColor Green
+    $pythonCmd = Resolve-PythonCommand
+    if (-not $pythonCmd) {
+      Write-Host "      ERROR - no se encontro Python con uvicorn instalado." -ForegroundColor Red
+      Write-Host "        Ejecuta: .\instalar-requisitos-footyiq.bat" -ForegroundColor DarkGray
+    } else {
+      # En Windows (Python 3.13), Playwright puede fallar con --reload
+      # al crear subprocess internos. Se arranca sin recarga para estabilidad.
+      $cmd = "$pythonCmd -m uvicorn app.main:app --port 8001"
+      Start-InNewWindow -Title "footyiq-scraper" -WorkingDir "$Root\scraper" -Command $cmd
+      Write-Host "      Lanzado en nueva ventana ($pythonCmd)" -ForegroundColor Green
+    }
   }
 } else {
   Write-Host "[2/4] Scraper (saltado)" -ForegroundColor DarkGray

@@ -65,6 +65,10 @@ REM playwright se usa en scraper/app/browser_client.py y no esta fijado en requi
 call %PYTHON_CMD% -m pip install playwright
 if errorlevel 1 goto :fail
 
+echo [INFO] Scraper: instalando navegador Chromium de Playwright
+call %PYTHON_CMD% -m playwright install chromium
+if errorlevel 1 goto :fail
+
 echo [INFO] Backend: resolviendo dependencias Maven
 call mvn -q -f "backend\pom.xml" -DskipTests dependency:go-offline
 if errorlevel 1 goto :fail
