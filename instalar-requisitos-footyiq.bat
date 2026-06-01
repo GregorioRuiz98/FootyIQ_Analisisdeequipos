@@ -20,6 +20,21 @@ call :ensure_java21
 call :ensure_tool "Maven" mvn "Apache.Maven"
 call :ensure_python
 call :ensure_docker
+call :refresh_path
+
+where npm >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] npm no esta disponible en PATH despues de la instalacion.
+  echo         Cierra y abre una nueva terminal y vuelve a ejecutar este script.
+  exit /b 1
+)
+
+where mvn >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Maven no esta disponible en PATH despues de la instalacion.
+  echo         Cierra y abre una nueva terminal y vuelve a ejecutar este script.
+  exit /b 1
+)
 
 echo.
 echo [INFO] Instalando dependencias del proyecto...
@@ -190,6 +205,22 @@ where py >nul 2>nul
 if not errorlevel 1 (
   set "PYTHON_CMD=py -3"
   exit /b 0
+)
+exit /b 0
+
+:refresh_path
+set "SYS_PATH="
+set "USR_PATH="
+
+for /f "tokens=2,*" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul ^| findstr /i "Path"') do set "SYS_PATH=%%b"
+for /f "tokens=2,*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul ^| findstr /i "Path"') do set "USR_PATH=%%b"
+
+if defined SYS_PATH (
+  if defined USR_PATH (
+    set "PATH=%SYS_PATH%;%USR_PATH%"
+  ) else (
+    set "PATH=%SYS_PATH%"
+  )
 )
 exit /b 0
 
