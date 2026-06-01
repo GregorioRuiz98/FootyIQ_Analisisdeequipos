@@ -4,3 +4,4 @@ httpx==0.28.1
 beautifulsoup4==4.13.3
 pydantic==2.10.6
 apscheduler==3.11.0
+playwright==1.60.0

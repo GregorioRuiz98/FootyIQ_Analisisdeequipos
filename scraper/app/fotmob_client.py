@@ -23,10 +23,30 @@ class FotmobClient:
         return self._build_dashboard(embedded_json)
 
     async def fetch_league(self, league_id: int) -> dict:
+        # 1) Browser real (sesion humana via CDP) para evitar bloqueos 403.
+        via_browser = await browser_client.fetch_json(f"/api/data/leagues?id={league_id}")
+        if isinstance(via_browser, dict) and via_browser.get("error") is None and via_browser:
+            return via_browser
+        logging.warning(
+            "fetch_league browser path failed for leagueId=%s -> %s",
+            league_id,
+            via_browser if isinstance(via_browser, dict) else type(via_browser).__name__,
+        )
+
         payload = await self._fetch_json(f"/api/data/leagues?id={league_id}")
         return payload if isinstance(payload, dict) else {"leagueId": league_id, "raw": payload}
 
     async def fetch_team(self, team_id: int) -> dict:
+        # 1) Browser real (sesion humana via CDP) para evitar bloqueos 403.
+        via_browser = await browser_client.fetch_json(f"/api/data/teams?id={team_id}")
+        if isinstance(via_browser, dict) and via_browser.get("error") is None and via_browser:
+            return via_browser
+        logging.warning(
+            "fetch_team browser path failed for teamId=%s -> %s",
+            team_id,
+            via_browser if isinstance(via_browser, dict) else type(via_browser).__name__,
+        )
+
         payload = await self._fetch_json(f"/api/data/teams?id={team_id}")
         return payload if isinstance(payload, dict) else {"teamId": team_id, "raw": payload}
 
@@ -46,7 +66,14 @@ class FotmobClient:
         if isinstance(payload, dict) and payload and payload.get("error") is None:
             return payload
 
-        # 3) Fallback: extraer del squad del equipo (datos minimos).
+        # 3) Fallback avanzado: extraer __NEXT_DATA__ de la pagina del jugador.
+        player_html = await browser_client.fetch_page_html(f"/players/{player_id}")
+        if isinstance(player_html, str):
+            from_html = self._extract_next_page_data(player_html)
+            if isinstance(from_html, dict) and from_html:
+                return from_html
+
+        # 4) Fallback: extraer del squad del equipo (datos minimos).
         if team_id:
             team_payload = await self.fetch_team(team_id)
             extracted = self._extract_player_from_team_payload(team_payload, player_id)
@@ -80,7 +107,14 @@ class FotmobClient:
         if isinstance(fallback, dict) and fallback and fallback.get("error") is None:
             return fallback
 
-        # 4) Fallback simplificado desde fixtures de la liga.
+        # 4) Fallback avanzado: extraer __NEXT_DATA__ de la pagina del partido.
+        match_html = await browser_client.fetch_page_html(f"/matches/{match_id}")
+        if isinstance(match_html, str):
+            from_html = self._extract_next_page_data(match_html)
+            if isinstance(from_html, dict) and from_html:
+                return from_html
+
+        # 5) Fallback simplificado desde fixtures de la liga.
         if league_id:
             league_payload = await self.fetch_league(league_id)
             extracted = self._extract_match_from_league_payload(league_payload, match_id)
@@ -94,6 +128,18 @@ class FotmobClient:
         return fallback if isinstance(fallback, dict) else {"matchId": match_id, "raw": fallback}
 
     async def fetch_matches_by_date(self, date_yyyymmdd: str) -> dict:
+        # 1) Browser real (sesion humana via CDP) para evitar bloqueos 403.
+        via_browser = await browser_client.fetch_json(
+            f"/api/data/matches?date={date_yyyymmdd}&includeNextDayLateNight=true"
+        )
+        if isinstance(via_browser, dict) and via_browser and via_browser.get("error") is None:
+            return via_browser
+        logging.warning(
+            "fetch_matches_by_date browser path failed for date=%s -> %s",
+            date_yyyymmdd,
+            via_browser if isinstance(via_browser, dict) else type(via_browser).__name__,
+        )
+
         payload = await self._fetch_json(
             f"/api/data/matches?date={date_yyyymmdd}&includeNextDayLateNight=true"
         )
@@ -220,6 +266,26 @@ class FotmobClient:
 
         # Fallback if FotMob changes the script structure.
         return {}
+
+    def _extract_next_page_data(self, html: str) -> dict:
+        soup = BeautifulSoup(html, "html.parser")
+        script = soup.find("script", id="__NEXT_DATA__")
+        if not script:
+            return {}
+
+        raw = script.string or script.text or ""
+        if not raw:
+            return {}
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+
+        props = parsed.get("props", {}) if isinstance(parsed, dict) else {}
+        page_props = props.get("pageProps", {}) if isinstance(props, dict) else {}
+        data = page_props.get("data", {}) if isinstance(page_props, dict) else {}
+        return data if isinstance(data, dict) else {}
 
     def _build_dashboard(self, data: dict) -> dict:
         now = datetime.now()

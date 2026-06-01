@@ -12,6 +12,8 @@ import asyncio
 import json
 import logging
 import os
+import re
+from urllib.parse import parse_qs, urlparse
 from typing import Any
 
 import httpx
@@ -88,23 +90,24 @@ class FotmobBrowserClient:
                 return {"error": "browser_not_available", "hint": "lanza scraper/launch_chrome.ps1"}
             return await self._do_fetch(page, path)
 
+    async def fetch_page_html(self, path: str) -> str | dict:
+        async with self._lock:
+            page = await self._ensure()
+            if page is None:
+                return {"error": "browser_not_available", "hint": "lanza scraper/launch_chrome.ps1"}
+
+            url = path if path.startswith("http") else f"https://www.fotmob.com{path}"
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                await page.wait_for_timeout(350)
+                return await page.content()
+            except Exception as exc:
+                return {"error": "browser_html_failed", "path": path, "message": str(exc)}
+
     async def _do_fetch(self, page: Page, path: str) -> Any:
         url = path if path.startswith("http") else f"https://www.fotmob.com{path}"
         try:
-            result = await page.evaluate(
-                """
-                async (u) => {
-                    try {
-                        const r = await fetch(u, { headers: { accept: 'application/json' }, credentials: 'include' });
-                        const text = await r.text();
-                        return { status: r.status, body: text };
-                    } catch (e) {
-                        return { error: String(e) };
-                    }
-                }
-                """,
-                url,
-            )
+            result = await self._eval_fetch(page, url)
         except Exception as exc:
             return {"error": "browser_failed", "message": str(exc)}
 
@@ -115,12 +118,80 @@ class FotmobBrowserClient:
 
         status = result.get("status")
         body = result.get("body", "")
+
+        # Si FotMob bloquea por contexto/antibot, visita primero la pagina humana
+        # y reintenta la API con la misma sesion/cookies del navegador real.
+        if status is None or status >= 400:
+            warmup_url = self._warmup_url_for_api_path(path)
+            if warmup_url:
+                try:
+                    await page.goto(warmup_url, wait_until="domcontentloaded", timeout=30000)
+                    await page.wait_for_timeout(400)
+                    retry = await self._eval_fetch(page, url)
+                    if isinstance(retry, dict):
+                        status = retry.get("status")
+                        body = retry.get("body", "")
+                        if status is not None and status < 400:
+                            try:
+                                return json.loads(body)
+                            except Exception:
+                                return {"error": "invalid_json", "path": path, "snippet": body[:300]}
+                except Exception as exc:
+                    logging.warning("Warmup/retry failed for %s -> %s", path, exc)
+
         if status is None or status >= 400:
             return {"error": "fotmob_error", "status": status, "path": path, "snippet": body[:300]}
         try:
             return json.loads(body)
         except Exception:
             return {"error": "invalid_json", "path": path, "snippet": body[:300]}
+
+    async def _eval_fetch(self, page: Page, url: str) -> dict:
+        return await page.evaluate(
+            """
+            async (u) => {
+                try {
+                    const r = await fetch(u, { headers: { accept: 'application/json' }, credentials: 'include' });
+                    const text = await r.text();
+                    return { status: r.status, body: text };
+                } catch (e) {
+                    return { error: String(e) };
+                }
+            }
+            """,
+            url,
+        )
+
+    def _warmup_url_for_api_path(self, path: str) -> str | None:
+        parsed = urlparse(path)
+        qs = parse_qs(parsed.query or "")
+
+        if parsed.path.endswith("/api/data/playerData"):
+            player_id = (qs.get("id") or [None])[0]
+            if player_id:
+                return f"https://www.fotmob.com/players/{player_id}"
+
+        if parsed.path.endswith("/api/data/matchDetails"):
+            match_id = (qs.get("matchId") or [None])[0]
+            if match_id:
+                return f"https://www.fotmob.com/matches/{match_id}"
+
+        if parsed.path.endswith("/api/data/teams"):
+            team_id = (qs.get("id") or [None])[0]
+            if team_id:
+                return f"https://www.fotmob.com/teams/{team_id}"
+
+        if parsed.path.endswith("/api/data/leagues"):
+            league_id = (qs.get("id") or [None])[0]
+            if league_id:
+                return f"https://www.fotmob.com/leagues/{league_id}"
+
+        # Generic fallback for other endpoints that carry numeric ids in query.
+        m = re.search(r"(id|matchId)=([0-9]+)", parsed.query or "")
+        if m:
+            return "https://www.fotmob.com/"
+
+        return None
 
     async def close(self) -> None:
         async with self._lock:

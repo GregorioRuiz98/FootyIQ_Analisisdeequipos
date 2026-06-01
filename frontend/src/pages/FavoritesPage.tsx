@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useFavorites } from "../context/FavoritesContext";
 import type { Favorite, FavoriteType } from "../services/api";
+import { fallbackImageToInitials } from "../utils/imageFallback";
 
 const TEAM_LOGO = (id: number | string) =>
   `https://images.fotmob.com/image_resources/logo/teamlogo/${id}.png`;
@@ -46,20 +47,25 @@ function FavoritesSection({
         <span className="subtle">{items.length}</span>
       </div>
       {items.length === 0 ? (
-        <p className="subtle">Aún no has guardado ningún {title.slice(0, -1).toLowerCase()}.</p>
+        <p className="subtle">
+          Aún no has guardado ningún {title.slice(0, -1).toLowerCase()}.
+        </p>
       ) : (
         <ul className="fav-list">
           {items.map((fav) => {
             const img = imageFor(fav);
             return (
-              <li key={`${fav.type}:${fav.externalId}`} className="fav-list-item">
+              <li
+                key={`${fav.type}:${fav.externalId}`}
+                className="fav-list-item"
+              >
                 <Link to={hrefFor(fav)} className="fav-card">
                   {img ? (
                     <img
                       src={img}
                       alt={fav.name || ""}
                       className={`fav-img ${type === "PLAYER" ? "round" : ""}`}
-                      onError={(e) => ((e.currentTarget.style.visibility = "hidden"))}
+                      onError={(e) => fallbackImageToInitials(e, fav.name)}
                     />
                   ) : (
                     <span className="fav-img fav-img-icon">⚽</span>
@@ -112,14 +118,30 @@ export function FavoritesPage(): JSX.Element {
         <section className="glass-panel panel">
           <h3>FAVORITOS</h3>
           <p className="subtle">
-            Marca jugadores, equipos o partidos como favoritos con el icono ☆ para que aparezcan aquí.
+            Marca jugadores, equipos o partidos como favoritos con el icono ☆
+            para que aparezcan aquí.
           </p>
         </section>
       ) : null}
 
-      <FavoritesSection title="Jugadores" type="PLAYER" items={players} onRemove={onRemove} />
-      <FavoritesSection title="Equipos" type="TEAM" items={teams} onRemove={onRemove} />
-      <FavoritesSection title="Partidos" type="MATCH" items={matches} onRemove={onRemove} />
+      <FavoritesSection
+        title="Jugadores"
+        type="PLAYER"
+        items={players}
+        onRemove={onRemove}
+      />
+      <FavoritesSection
+        title="Equipos"
+        type="TEAM"
+        items={teams}
+        onRemove={onRemove}
+      />
+      <FavoritesSection
+        title="Partidos"
+        type="MATCH"
+        items={matches}
+        onRemove={onRemove}
+      />
     </div>
   );
 }

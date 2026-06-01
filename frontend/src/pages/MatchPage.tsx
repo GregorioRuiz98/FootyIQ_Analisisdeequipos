@@ -9,6 +9,7 @@ import {
   type StoredMatch,
 } from "../services/api";
 import { FavoriteButton } from "../components/FavoriteButton";
+import { fallbackImageToInitials } from "../utils/imageFallback";
 
 type Json = unknown;
 type Dict = Record<string, unknown>;
@@ -43,6 +44,16 @@ function num(v: unknown): number | null {
     return Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+function isRichMatchPayload(v: Dict | null): boolean {
+  if (!isObj(v)) return false;
+  if (v.error) return false;
+  return (
+    isObj(v.header) ||
+    isObj(v.general) ||
+    isObj(get(v, ["content", "matchFacts"]))
+  );
 }
 
 // ---------- Round / matchweek helpers ----------
@@ -461,7 +472,9 @@ function MatchHeader({
             name={`${homeName} vs ${awayName}`}
             metadata={{
               leagueName: league || "",
-              leagueId: detail?.leagueExternalId ? String(detail.leagueExternalId) : "",
+              leagueId: detail?.leagueExternalId
+                ? String(detail.leagueExternalId)
+                : "",
               date: utcLabel || "",
               scoreStr: typeof scoreStr === "string" ? scoreStr : "",
               subtitle: `${league || ""}${utcLabel ? ` · ${utcLabel}` : ""}`,
@@ -472,7 +485,11 @@ function MatchHeader({
       <div className="mh-row">
         <div className="mh-team">
           {homeLogo ? (
-            <img src={homeLogo} alt={homeName} />
+            <img
+              src={homeLogo}
+              alt={homeName}
+              onError={(e) => fallbackImageToInitials(e, homeName)}
+            />
           ) : (
             <div className="mh-logo-ph" />
           )}
@@ -484,7 +501,11 @@ function MatchHeader({
         </div>
         <div className="mh-team mh-team-away">
           {awayLogo ? (
-            <img src={awayLogo} alt={awayName} />
+            <img
+              src={awayLogo}
+              alt={awayName}
+              onError={(e) => fallbackImageToInitials(e, awayName)}
+            />
           ) : (
             <div className="mh-logo-ph" />
           )}
@@ -733,6 +754,15 @@ function OverviewTab({ json }: { json: Dict }) {
                 src={str((mvp as Dict).imageUrl)}
                 alt="MVP"
                 className="mvp-img"
+                onError={(e) =>
+                  fallbackImageToInitials(
+                    e,
+                    str(
+                      get(mvp, ["name", "fullName"]),
+                      str(get(mvp, ["name"]), "MVP"),
+                    ),
+                  )
+                }
               />
             ) : null}
             <div>
@@ -2085,6 +2115,9 @@ export function MatchPage(): JSX.Element {
   const [matchJson, setMatchJson] = useState<Dict | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const hasRichMatchJson = isRichMatchPayload(matchJson);
+  const richMatchJson = hasRichMatchJson ? (matchJson as Dict) : null;
   const [tab, setTab] = useState<Tab>("Resumen");
 
   useEffect(() => {
@@ -2230,9 +2263,9 @@ export function MatchPage(): JSX.Element {
         {error ? <p className="subtle error">{error}</p> : null}
       </section>
 
-      {matchJson ? (
+      {hasRichMatchJson ? (
         <>
-          <MatchHeader json={matchJson} detail={matchDetail} />
+          <MatchHeader json={richMatchJson} detail={matchDetail} />
 
           <div className="match-tabs">
             {TABS.map((t) => (
@@ -2248,16 +2281,34 @@ export function MatchPage(): JSX.Element {
           </div>
 
           <section className="glass-panel panel">
-            {tab === "Resumen" ? <OverviewTab json={matchJson} /> : null}
-            {tab === "Estadísticas" ? <StatsTab json={matchJson} /> : null}
-            {tab === "Alineaciones" ? <LineupsTab json={matchJson} /> : null}
-            {tab === "Shotmap" ? <ShotmapTab json={matchJson} /> : null}
-            {tab === "Momentum" ? <MomentumTab json={matchJson} /> : null}
-            {tab === "Top Players" ? <TopPlayersTab json={matchJson} /> : null}
-            {tab === "H2H" ? <H2HTab json={matchJson} /> : null}
-            {tab === "JSON" ? (
-              <RawJsonTab json={matchJson} matchId={selectedMatch} />
+            {tab === "Resumen" ? <OverviewTab json={richMatchJson!} /> : null}
+            {tab === "Estadísticas" ? <StatsTab json={richMatchJson!} /> : null}
+            {tab === "Alineaciones" ? (
+              <LineupsTab json={richMatchJson!} />
             ) : null}
+            {tab === "Shotmap" ? <ShotmapTab json={richMatchJson!} /> : null}
+            {tab === "Momentum" ? <MomentumTab json={richMatchJson!} /> : null}
+            {tab === "Top Players" ? (
+              <TopPlayersTab json={richMatchJson!} />
+            ) : null}
+            {tab === "H2H" ? <H2HTab json={richMatchJson!} /> : null}
+            {tab === "JSON" ? (
+              <RawJsonTab json={richMatchJson!} matchId={selectedMatch} />
+            ) : null}
+          </section>
+        </>
+      ) : matchDetail ? (
+        <>
+          <MatchHeader json={null} detail={matchDetail} />
+          <section className="glass-panel panel">
+            <p className="subtle">
+              No hay perfil avanzado disponible para este partido en este
+              momento.
+            </p>
+            <p className="subtle">
+              Se muestra la informacion basica almacenada. Intenta de nuevo tras
+              refrescar datos de la liga.
+            </p>
           </section>
         </>
       ) : !loading ? (

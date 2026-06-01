@@ -8,6 +8,7 @@ import {
   type StoredMatch,
   type StoredTeam,
 } from "../services/api";
+import { fallbackImageToInitials } from "../utils/imageFallback";
 
 const TEAM_LOGO = (id: number | string) =>
   `https://images.fotmob.com/image_resources/logo/teamlogo/${id}.png`;
@@ -267,9 +268,7 @@ export function CompetitionPage(): JSX.Element {
                           src={TEAM_LOGO(row.teamId)}
                           alt=""
                           className="team-logo"
-                          onError={(e) =>
-                            (e.currentTarget.style.visibility = "hidden")
-                          }
+                          onError={(e) => fallbackImageToInitials(e, row.name)}
                         />
                         <Link to={teamHref(row.teamId)} className="player-link">
                           {row.name}

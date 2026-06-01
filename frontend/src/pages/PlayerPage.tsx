@@ -12,6 +12,7 @@ import {
 } from "../services/api";
 import { exportPlayerReportPdf } from "../utils/playerPdf";
 import { FavoriteButton } from "../components/FavoriteButton";
+import { fallbackImageToInitials } from "../utils/imageFallback";
 
 type AnyDict = Record<string, any>;
 
@@ -129,16 +130,16 @@ export function PlayerPage(): JSX.Element {
       .catch(() => setPlayerDetail(null));
     setRichLoading(true);
     setPlayerRich(null);
-    getPlayerData(selectedPlayer)
+    getPlayerData(selectedPlayer, selectedTeam || undefined)
       .then((raw) => {
         const data = isObj((raw as AnyDict)?.data)
           ? ((raw as AnyDict).data as AnyDict)
           : (raw as AnyDict);
-        setPlayerRich(data || null);
+        setPlayerRich(isRichPlayerPayload(data) ? data : null);
       })
       .catch(() => setPlayerRich(null))
       .finally(() => setRichLoading(false));
-  }, [selectedPlayer]);
+  }, [selectedPlayer, selectedTeam]);
 
   const currentTeamName = useMemo(() => {
     return teams.find((t) => t.externalId === selectedTeam)?.name || "Equipo";
@@ -244,6 +245,17 @@ export function PlayerPage(): JSX.Element {
 // ---------- helpers ----------
 function isObj(x: unknown): x is AnyDict {
   return !!x && typeof x === "object" && !Array.isArray(x);
+}
+
+function isRichPlayerPayload(data: AnyDict | null | undefined): boolean {
+  if (!isObj(data)) return false;
+  if (data.error) return false;
+  return (
+    isObj(data.header) ||
+    isObj(data.mainLeague) ||
+    Array.isArray(data.recentMatches) ||
+    isObj(data.content)
+  );
 }
 function asArr(x: unknown): any[] {
   return Array.isArray(x) ? x : [];
@@ -376,7 +388,7 @@ function PlayerProfileView({
           className="pp-photo"
           src={playerId ? PLAYER_PHOTO(playerId) : ""}
           alt={name}
-          onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+          onError={(e) => fallbackImageToInitials(e, name)}
         />
         <div className="pp-meta">
           <h2 className="pp-name">
@@ -393,7 +405,7 @@ function PlayerProfileView({
                 className="pp-team-logo"
                 src={TEAM_LOGO(teamId)}
                 alt={teamName}
-                onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+                onError={(e) => fallbackImageToInitials(e, teamName)}
               />
               {teamName || "Equipo"}
             </Link>
@@ -432,7 +444,9 @@ function PlayerProfileView({
         <div className="pp-actions">
           <FavoriteButton
             type="PLAYER"
-            externalId={typeof playerId === "number" ? playerId : Number(playerId)}
+            externalId={
+              typeof playerId === "number" ? playerId : Number(playerId)
+            }
             name={name}
             metadata={{
               teamName: teamName || "",
@@ -496,7 +510,9 @@ function PlayerProfileView({
                 <img
                   src={TEAM_LOGO(nextMatch.homeId)}
                   alt={str(nextMatch.homeName)}
-                  onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+                  onError={(e) =>
+                    fallbackImageToInitials(e, str(nextMatch.homeName))
+                  }
                 />
               ) : null}
               <span>{str(nextMatch.homeName, "-")}</span>
@@ -518,7 +534,9 @@ function PlayerProfileView({
                 <img
                   src={TEAM_LOGO(nextMatch.awayId)}
                   alt={str(nextMatch.awayName)}
-                  onError={(e) => (e.currentTarget.style.visibility = "hidden")}
+                  onError={(e) =>
+                    fallbackImageToInitials(e, str(nextMatch.awayName))
+                  }
                 />
               ) : null}
             </span>
@@ -604,9 +622,7 @@ function PlayerProfileView({
                       <img
                         src={TEAM_LOGO(oppId)}
                         alt={opp}
-                        onError={(e) =>
-                          (e.currentTarget.style.visibility = "hidden")
-                        }
+                        onError={(e) => fallbackImageToInitials(e, opp)}
                       />
                     ) : null}
                     {opp}

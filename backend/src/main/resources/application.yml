@@ -11,3 +11,9 @@ app:
   jwtExpirationMs: 86400000
   scraperBaseUrl: ${SCRAPER_BASE_URL:http://localhost:8001}
   uploadsPath: ${UPLOADS_PATH:uploads}
+  demoAccount:
+    enabled: ${DEMO_ACCOUNT_ENABLED:true}
+    username: ${DEMO_ACCOUNT_USERNAME:demo}
+    email: ${DEMO_ACCOUNT_EMAIL:demo@footyiq.local}
+    password: ${DEMO_ACCOUNT_PASSWORD:123456}
+    role: ${DEMO_ACCOUNT_ROLE:ANALYST}

@@ -13,3 +13,6 @@ scraper/.venv/
 uploads/
 
 scraper/.browser_profile/
+scraper/.chrome_profile/
+frontend/tsconfig.tsbuildinfo
+tmp_playerdata.json

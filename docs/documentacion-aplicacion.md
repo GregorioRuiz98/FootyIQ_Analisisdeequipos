@@ -419,7 +419,7 @@ Pruebas recomendadas:
 
 - La disponibilidad de datos depende de FotMob.
 - Cambios en el proveedor externo pueden afectar al scraper.
-- La cuenta demo solo rellena credenciales en pantalla; si el usuario no existe, debe registrarse.
+- La cuenta demo se crea automaticamente al arrancar el backend (si no existe).
 - El secreto JWT incluido es de desarrollo.
 - Algunas vistas dependen de identificadores externos correctos.
 - La ejecución local requiere que los servicios estén levantados en los puertos esperados.
