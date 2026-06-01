@@ -32,7 +32,8 @@ public class StoredDataController {
 
     @PostMapping("/import/league/{leagueId}")
     public DataImportRun importLeague(@PathVariable int leagueId, Authentication authentication) {
-        return ingestionService.importLeagueToDatabase(leagueId, authentication.getName());
+        String actor = authentication != null ? authentication.getName() : "anonymous";
+        return ingestionService.importLeagueToDatabase(leagueId, actor);
     }
 
     @DeleteMapping("/competition/{leagueId}")

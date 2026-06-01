@@ -56,7 +56,7 @@ function Resolve-PythonCommand {
 
   foreach ($candidate in $candidates) {
     try {
-      $checkCmd = "$candidate -c \"import uvicorn\""
+      $checkCmd = '{0} -c "import uvicorn"' -f $candidate
       cmd /c $checkCmd *> $null
       if ($LASTEXITCODE -eq 0) {
         return $candidate

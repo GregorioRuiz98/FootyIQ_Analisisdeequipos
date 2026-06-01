@@ -50,6 +50,25 @@ Before running the app for the first time on a new machine:
 
 This installs Node, Java 21, Maven, Python, project dependencies and Playwright Chromium for the scraper.
 
+Recommended clean setup flow on Windows:
+
+1. Open PowerShell as normal user in the project root.
+2. Run `./instalar-requisitos-footyiq.bat`.
+3. If winget installs new tools (Node/Java/Python/Maven/Docker), close and reopen PowerShell.
+4. Run `./instalar-requisitos-footyiq.bat` again to complete project dependency installation.
+5. Start the app with `./abrir-footyiq.bat`.
+6. If Chrome opens for FotMob validation, visit `https://www.fotmob.com/` and complete Cloudflare once.
+
+Common issues on first install:
+
+- `npm EPERM ... esbuild.exe` on Windows:
+	- The installer now retries once automatically after stopping `node.exe` and cleaning `frontend/node_modules`.
+	- If it still fails, close running frontend terminals/editors and retry `./instalar-requisitos-footyiq.bat`.
+- `npm no esta disponible en PATH` or `Maven no esta disponible en PATH`:
+	- Close and reopen terminal, then run the installer again.
+- `No module named uvicorn` when starting scraper:
+	- Re-run `./instalar-requisitos-footyiq.bat` to ensure Python packages are installed.
+
 ### Docker Compose
 
 ```powershell

@@ -45,19 +45,35 @@ if not exist "uploads" mkdir "uploads"
 if exist "frontend\package-lock.json" (
   echo [INFO] Frontend: npm ci
   pushd "frontend"
+  taskkill /f /im node.exe >nul 2>nul
   call npm ci
-  if errorlevel 1 (
-    popd
-    goto :fail
+  set "NPM_EXIT=!ERRORLEVEL!"
+  if not "!NPM_EXIT!"=="0" (
+    echo [WARN] npm ci fallo. Reintentando tras limpiar node_modules...
+    if exist "node_modules" rmdir /s /q "node_modules"
+    call npm ci
+    set "NPM_EXIT=!ERRORLEVEL!"
+    if not "!NPM_EXIT!"=="0" (
+      popd
+      goto :fail
+    )
   )
   popd
 ) else (
   echo [INFO] Frontend: npm install
   pushd "frontend"
+  taskkill /f /im node.exe >nul 2>nul
   call npm install
-  if errorlevel 1 (
-    popd
-    goto :fail
+  set "NPM_EXIT=!ERRORLEVEL!"
+  if not "!NPM_EXIT!"=="0" (
+    echo [WARN] npm install fallo. Reintentando tras limpiar node_modules...
+    if exist "node_modules" rmdir /s /q "node_modules"
+    call npm install
+    set "NPM_EXIT=!ERRORLEVEL!"
+    if not "!NPM_EXIT!"=="0" (
+      popd
+      goto :fail
+    )
   )
   popd
 )
@@ -134,7 +150,8 @@ set "JAVA_MAJOR="
 where java >nul 2>nul
 if errorlevel 1 goto :install_java21
 
-for /f "tokens=2 delims=\"" %%a in ('java -version 2^>^&1 ^| findstr /i "version"') do set "JAVA_VER=%%a"
+set "JAVA_VER="
+for /f "tokens=3" %%a in ('java -version 2^>^&1 ^| findstr /i "version"') do set "JAVA_VER=%%~a"
 for /f "tokens=1 delims=." %%a in ("!JAVA_VER!") do set "JAVA_MAJOR=%%a"
 
 if "!JAVA_MAJOR!"=="21" (
@@ -209,6 +226,7 @@ if not errorlevel 1 (
 exit /b 0
 
 :refresh_path
+set "CUR_PATH=%PATH%"
 set "SYS_PATH="
 set "USR_PATH="
 
@@ -217,10 +235,12 @@ for /f "tokens=2,*" %%a in ('reg query "HKCU\Environment" /v Path 2^>nul ^| find
 
 if defined SYS_PATH (
   if defined USR_PATH (
-    set "PATH=%SYS_PATH%;%USR_PATH%"
+    set "PATH=%SYS_PATH%;%USR_PATH%;%CUR_PATH%"
   ) else (
-    set "PATH=%SYS_PATH%"
+    set "PATH=%SYS_PATH%;%CUR_PATH%"
   )
+) else (
+  set "PATH=%CUR_PATH%"
 )
 exit /b 0
 
