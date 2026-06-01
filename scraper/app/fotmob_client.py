@@ -114,10 +114,19 @@ class FotmobClient:
             if isinstance(from_html, dict) and from_html:
                 return from_html
 
-        # 5) Fallback simplificado desde fixtures de la liga.
+        # 5) Fallback desde fixtures de la liga. Primero intenta abrir la URL
+        # canonica del partido y extraer __NEXT_DATA__ (mas rico que allMatches).
         if league_id:
             league_payload = await self.fetch_league(league_id)
             extracted = self._extract_match_from_league_payload(league_payload, match_id)
+            if extracted:
+                page_url = extracted.get("pageUrl") if isinstance(extracted, dict) else None
+                if isinstance(page_url, str) and page_url.strip():
+                    match_html = await browser_client.fetch_page_html(page_url)
+                    if isinstance(match_html, str):
+                        from_html = self._extract_next_page_data(match_html)
+                        if isinstance(from_html, dict) and from_html:
+                            return from_html
             if extracted:
                 return {
                     "source": "league_fixtures",
