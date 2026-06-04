@@ -7,6 +7,29 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
+export function resolveBackendAssetUrl(path?: string | null): string {
+  if (!path) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  if (/^https?:\/\//i.test(API_URL)) {
+    try {
+      const backendBase = new URL(API_URL);
+      return `${backendBase.origin}${normalizedPath}`;
+    } catch {
+      return normalizedPath;
+    }
+  }
+
+  return normalizedPath;
+}
+
 export function setAuthToken(token: string | null): void {
   if (token) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`;

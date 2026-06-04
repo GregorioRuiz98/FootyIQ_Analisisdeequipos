@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,9 +34,14 @@ public class TeamService {
     }
 
     public CustomTeam createTeam(String username, String name, boolean shared, MultipartFile logo) {
+        String sanitizedName = name == null ? "" : name.trim();
+        if (sanitizedName.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre del equipo es obligatorio");
+        }
+
         CustomTeam team = new CustomTeam();
         team.setOwnerUsername(username);
-        team.setName(name);
+        team.setName(sanitizedName);
         team.setShared(shared);
         team.setLogoPath(storeFile("logos", logo));
         return customTeamRepository.save(team);
@@ -52,6 +58,9 @@ public class TeamService {
         player.setId(UUID.randomUUID().toString());
         if (photo != null && !photo.isEmpty()) {
             player.setPhotoPath(storeFile("players", photo));
+        }
+        if (team.getPlayers() == null) {
+            team.setPlayers(new ArrayList<>());
         }
         team.getPlayers().add(player);
         return customTeamRepository.save(team);

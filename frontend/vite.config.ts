@@ -12,6 +12,11 @@ export default defineConfig({
         target: "http://localhost:8080",
         changeOrigin: true,
       },
+      // Proxy uploaded assets (team logos/player photos) served by Spring static handler.
+      "/uploads": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
       // Proxy FotMob images to avoid CORS issues (used by PDF export).
       "/fotmob-img": {
         target: "https://images.fotmob.com",

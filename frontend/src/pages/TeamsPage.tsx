@@ -1,17 +1,37 @@
-import { FormEvent, useEffect, useState } from "react";
-import { addPlayer, createTeam, getTeams } from "../services/api";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  addPlayer,
+  createTeam,
+  getTeams,
+  resolveBackendAssetUrl,
+} from "../services/api";
 import type { CustomTeam } from "../types";
+import axios from "axios";
 
 export function TeamsPage(): JSX.Element {
   const [teams, setTeams] = useState<CustomTeam[]>([]);
   const [newTeamName, setNewTeamName] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [shared, setShared] = useState(false);
+  const [savingTeam, setSavingTeam] = useState(false);
+  const [savingPlayer, setSavingPlayer] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [teamFilter, setTeamFilter] = useState("");
 
   const [selectedTeam, setSelectedTeam] = useState<string>("");
   const [playerName, setPlayerName] = useState("");
   const [playerNumber, setPlayerNumber] = useState(1);
   const [playerPosition, setPlayerPosition] = useState("MED");
+
+  const visibleTeams = useMemo(() => {
+    const q = teamFilter.trim().toLowerCase();
+    const list = q
+      ? teams.filter((team) => team.name?.toLowerCase().includes(q))
+      : teams;
+
+    return [...list].sort((a, b) => a.name.localeCompare(b.name));
+  }, [teams, teamFilter]);
 
   useEffect(() => {
     getTeams()
@@ -19,40 +39,68 @@ export function TeamsPage(): JSX.Element {
         setTeams(res);
         if (res.length > 0) setSelectedTeam(res[0].id);
       })
-      .catch(() => setTeams([]));
+      .catch((err: unknown) => {
+        setTeams([]);
+        setError(readApiError(err, "No se pudieron cargar tus equipos."));
+      });
   }, []);
 
   const onCreateTeam = async (evt: FormEvent): Promise<void> => {
     evt.preventDefault();
-    const created = await createTeam({
-      name: newTeamName,
-      shared,
-      logo: logoFile,
-    });
-    const next = [...teams, created];
-    setTeams(next);
-    setSelectedTeam(created.id);
-    setNewTeamName("");
-    setLogoFile(null);
-    setShared(false);
+    const name = newTeamName.trim();
+    if (!name) {
+      setError("Indica un nombre de equipo valido.");
+      setSuccess(null);
+      return;
+    }
+    setSavingTeam(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const created = await createTeam({
+        name,
+        shared,
+        logo: logoFile,
+      });
+      setTeams((prev) => [...prev, created]);
+      setSelectedTeam(created.id);
+      setNewTeamName("");
+      setLogoFile(null);
+      setShared(false);
+      setSuccess(`Equipo "${created.name}" creado correctamente.`);
+    } catch (err: unknown) {
+      setError(readApiError(err, "No se pudo crear el equipo."));
+      setSuccess(null);
+    } finally {
+      setSavingTeam(false);
+    }
   };
 
   const onAddPlayer = async (evt: FormEvent): Promise<void> => {
     evt.preventDefault();
     if (!selectedTeam) return;
 
-    const updated = await addPlayer(selectedTeam, {
-      name: playerName,
-      number: playerNumber,
-      position: playerPosition,
-      preferredFoot: "Right",
-    });
+    setSavingPlayer(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const updated = await addPlayer(selectedTeam, {
+        name: playerName,
+        number: playerNumber,
+        position: playerPosition,
+        preferredFoot: "Right",
+      });
 
-    setTeams((prev) =>
-      prev.map((team) => (team.id === updated.id ? updated : team)),
-    );
-    setPlayerName("");
-    setPlayerNumber(1);
+      setTeams((prev) =>
+        prev.map((team) => (team.id === updated.id ? updated : team)),
+      );
+      setPlayerName("");
+      setPlayerNumber(1);
+    } catch (err: unknown) {
+      setError(readApiError(err, "No se pudo anadir el jugador."));
+    } finally {
+      setSavingPlayer(false);
+    }
   };
 
   return (
@@ -87,22 +135,53 @@ export function TeamsPage(): JSX.Element {
             Compartido
           </label>
           <button className="cta" type="submit">
-            Crear equipo
+            {savingTeam ? "Creando..." : "Crear equipo"}
           </button>
         </form>
 
-        <div className="team-list">
-          {teams.map((team) => (
-            <button
-              key={team.id}
-              className={`team-item ${team.id === selectedTeam ? "active" : ""}`}
-              onClick={() => setSelectedTeam(team.id)}
-            >
-              <span>{team.name}</span>
-              <small>{team.players.length} jugadores</small>
-            </button>
-          ))}
+        {error ? <p className="subtle error">{error}</p> : null}
+        {success ? <p className="subtle">{success}</p> : null}
+
+        <div className="league-teams-head" style={{ marginTop: "0.8rem" }}>
+          <h4 style={{ margin: 0 }}>Mis equipos</h4>
+          <input
+            type="search"
+            placeholder="Filtrar equipo..."
+            value={teamFilter}
+            onChange={(e) => setTeamFilter(e.target.value)}
+            className="league-teams-search"
+          />
         </div>
+
+        {visibleTeams.length === 0 ? (
+          <p className="subtle">
+            {teams.length === 0
+              ? "Aun no has creado equipos."
+              : "Sin resultados para ese filtro."}
+          </p>
+        ) : (
+          <ul className="team-grid" aria-label="Mis equipos">
+            {visibleTeams.map((team) => (
+              <li key={team.id}>
+                <button
+                  type="button"
+                  className={`team-card ${team.id === selectedTeam ? "active" : ""}`}
+                  onClick={() => setSelectedTeam(team.id)}
+                >
+                  <TeamAvatar
+                    logoPath={team.logoPath}
+                    name={team.name}
+                    size={56}
+                  />
+                  <span className="team-card-name">{team.name}</span>
+                  <span className="subtle team-card-country">
+                    {team.players?.length ?? 0} jugadores
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="glass-panel panel">
@@ -153,11 +232,64 @@ export function TeamsPage(): JSX.Element {
               </select>
             </label>
           </div>
-          <button className="cta" type="submit" disabled={!selectedTeam}>
-            Anadir jugador
+          <button
+            className="cta"
+            type="submit"
+            disabled={!selectedTeam || savingPlayer}
+          >
+            {savingPlayer ? "Guardando..." : "Anadir jugador"}
           </button>
         </form>
       </section>
     </div>
   );
+}
+
+function TeamAvatar({
+  logoPath,
+  name,
+  size,
+}: {
+  logoPath?: string;
+  name: string;
+  size?: number;
+}): JSX.Element {
+  const [errored, setErrored] = useState(false);
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  const logoUrl = resolveBackendAssetUrl(logoPath);
+
+  return (
+    <span
+      className="team-logo"
+      style={{ width: size, height: size }}
+      title={name}
+    >
+      {logoUrl && !errored ? (
+        <img
+          src={logoUrl}
+          alt={name}
+          loading="lazy"
+          onError={() => setErrored(true)}
+        />
+      ) : (
+        <span className="team-logo-fallback">{initial}</span>
+      )}
+    </span>
+  );
+}
+
+function readApiError(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const message =
+      typeof error.response?.data === "string"
+        ? error.response.data
+        : (error.response?.data as { message?: string } | undefined)?.message;
+    if (message) {
+      return message;
+    }
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      return "Sesion expirada o no autorizada. Vuelve a iniciar sesion.";
+    }
+  }
+  return fallback;
 }
